@@ -40,4 +40,4 @@ cd ../repository && zip -r ../cloudformation/zip/init-source ./ -x .git/\* targe
 aws s3 mb s3://$profile_id-$project_name-codecommit
 # We run sync even if the creation of the bucket failed, because it might be already created
 aws s3 sync ./zip s3://$profile_id-$project_name-codecommit --profile $profile --region $region
-"C:\Program Files\Amazon\AWSSAMCLI\bin\sam.cmd" deploy -t main.yml --stack-name $project_name --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --profile $profile --region $region --parameter-overrides ProjectName=$project_name
+sam deploy -t main.yml --stack-name $project_name --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --profile $profile --region $region --parameter-overrides ProjectName=$project_name

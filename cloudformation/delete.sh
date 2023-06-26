@@ -38,4 +38,4 @@ rm -rf ./zip
 aws s3 rb s3://$profile_id-$project_name-codecommit --force  
 aws s3 rm s3://$profile_id-$project_name-artifacts --recursive
 aws s3 rm s3://$profile_id-$project_name-builds --recursive
-"C:\Program Files\Amazon\AWSSAMCLI\bin\sam.cmd" delete --stack-name $project_name --profile $profile --region $region
+sam delete --stack-name $project_name --profile $profile --region $region
