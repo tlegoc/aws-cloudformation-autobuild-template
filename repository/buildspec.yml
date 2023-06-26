@@ -1,0 +1,23 @@
+version: 0.2
+env:
+  shell: bash
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+    # commands:
+    #   - echo "command"
+  # pre_build:
+  #   commands:
+  #     - echo "command"
+  build:
+    commands:
+      - chmod +x mvnw
+      - ./mvnw clean install
+  # post_build:
+  #   commands:
+  #     - echo "post build"
+artifacts:
+  base-directory: target
+  files:
+    - "**/*"

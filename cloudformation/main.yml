@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  ProjectName:
+    Type: String
+    Default: DefaultDevOpsProjectName
+    Description: Resources prefix to append to the begining of each name.
+
+Resources:
+  DevOpsFormationRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub "${ProjectName}-devopsformation-role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+                - codepipeline.amazonaws.com
+                - events.amazonaws.com
+                - s3.amazonaws.com
+                - cloudwatch.amazonaws.com
+                - iam.amazonaws.com
+                - codecommit.amazonaws.com
+                - codeartifact.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'    
+      Path: "/"
+      Policies:
+        - PolicyName: !Sub '${ProjectName}-code-pipeline-policy'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - codecommit:GetBranch
+                  - codecommit:GetCommit
+                  - codecommit:UploadArchive
+                  - codecommit:GetUploadArchiveStatus
+                  - codecommit:CancelUploadArchive
+                  - s3:*
+                  - codebuild:StartBuild
+                  - codebuild:CreateReportGroup
+                  - codebuild:CreateReport
+                  - codebuild:UpdateReport
+                  - codebuild:BatchPutTestCases
+                  - codebuild:BatchGetBuilds
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:PutRetentionPolicy
+                  - logs:DeleteLogGroup
+                  - codepipeline:*          
+                  - cloudwatch:*
+                  - lambda:*
+                  - iam:*
+                  - codeartifact:*
+                  - sts:*
+                  - ssm:AddTagsToResource
+                Resource: '*'
+      Tags: 
+        - Key: ProjectName
+          Value: !Sub ${ProjectName}
+
+  DevOpsFormationArtifactS3:
+    Type: AWS::S3::Bucket
+    Description: Artifact bucket, will hold build results from CodeBuild.
+    Properties:
+      BucketName: !Sub "${AWS::AccountId}-${ProjectName}-artifacts"
+      Tags:
+        - Key: ProjectName
+          Value: !Sub ${ProjectName}
+
+  DevOpsFormationBuildS3:
+    Type: AWS::S3::Bucket
+    Description: Artifact bucket, will hold build results from CodeBuild.
+    Properties:
+      BucketName: !Sub "${AWS::AccountId}-${ProjectName}-builds"
+      Tags:
+        - Key: ProjectName
+          Value: !Sub ${ProjectName}
+
+  DevOpsFormationCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${AWS::AccountId}-${ProjectName}-codebuild
+      ServiceRole: !GetAtt DevOpsFormationRole.Arn
+      Description: CodeBuild resource that will automatically build and package our code.
+      Artifacts:
+        Type: S3
+        Location: !Ref DevOpsFormationArtifactS3
+        EncryptionDisabled: true
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:6.0
+      Source:
+        Location: !GetAtt DevOpsFormationCodeCommit.CloneUrlHttp
+        Type: CODECOMMIT
+      Tags:
+        - Key: ProjectName
+          Value: !Sub ${ProjectName}
+  
+  DevOpsFormationCodeCommit:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Sub ${ProjectName}-codecommit
+      RepositoryDescription: "Project code, will be automatically built on each commit."
+      Code: 
+        BranchName: "master"
+        S3:
+          Bucket: !Sub ${AWS::AccountId}-${ProjectName}-codecommit
+          Key: "init-source.zip"
+      Tags: 
+        - Key: ProjectName
+          Value: !Sub ${ProjectName}
+
+  DevOpsFormationPipeline: 
+    Type: AWS::CodePipeline::Pipeline 
+    Properties: 
+      Name: !Sub "${AWS::AccountId}-${ProjectName}-codepipeline"
+      RoleArn: !GetAtt DevOpsFormationRole.Arn
+      Stages: 
+        - Name: Source 
+          Actions: 
+            - Name: SourceAction
+              ActionTypeId: 
+                Category: Source 
+                Owner: AWS 
+                Version: 1 
+                Provider: CodeCommit 
+              OutputArtifacts: 
+                - Name: SourceOutput 
+              Configuration: 
+                BranchName: "master"
+                RepositoryName: !Sub ${ProjectName}-codecommit
+              RunOrder: 1 
+        - Name: Build 
+          Actions: 
+            - Name: BuildAction 
+              InputArtifacts: 
+                - Name: SourceOutput 
+              ActionTypeId: 
+                Category: Build 
+                Owner: AWS 
+                Version: 1 
+                Provider: CodeBuild
+              OutputArtifacts: 
+                - Name: BuildOutput 
+              Configuration: 
+                ProjectName: !Ref DevOpsFormationCodeBuildProject
+              RunOrder: 1 
+        - Name: Upload 
+          Actions: 
+            - Name: UploadAction 
+              InputArtifacts: 
+                - Name: BuildOutput 
+              ActionTypeId: 
+                Category: Deploy 
+                Owner: AWS 
+                Version: 1 
+                Provider: S3
+              Configuration:
+                BucketName: !Ref DevOpsFormationBuildS3
+                Extract: false
+                ObjectKey: "build.zip"
+              RunOrder: 1 
+      ArtifactStore: 
+        Type: S3 
+        Location: !Ref DevOpsFormationArtifactS3
+      Tags: 
+        - Key: ProjectName
+          Value: !Sub ${ProjectName}
+
+Outputs:
+  RepositoryUrl:
+    Value: !GetAtt DevOpsFormationCodeCommit.CloneUrlHttp
+  BuildBucketUrl:
+    Value: !GetAtt DevOpsFormationBuildS3.DomainName
