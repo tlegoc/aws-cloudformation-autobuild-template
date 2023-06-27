@@ -80,6 +80,28 @@ Resources:
       Tags:
         - Key: ProjectName
           Value: !Sub ${ProjectName}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: false
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+
+  DevOpsFormationBuildS3Policy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: DevOpsFormationBuildS3
+    Properties: 
+      Bucket: !Ref DevOpsFormationBuildS3
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: 
+              - "s3:GetObject"
+            Effect: Allow
+            Principal: "*"
+            Resource: !Join
+              - ''
+              - - !GetAtt DevOpsFormationBuildS3.Arn
+                - '/build.zip'
 
   DevOpsFormationCodeBuildProject:
     Type: AWS::CodeBuild::Project
