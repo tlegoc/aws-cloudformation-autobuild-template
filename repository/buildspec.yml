@@ -5,15 +5,15 @@ phases:
   install:
     runtime-versions:
       java: corretto17
-    # commands:
-    #   - echo "command"
+    commands:
+      - apt-get update -y
+      - apt-get install -y maven  
   # pre_build:
   #   commands:
   #     - echo "command"
   build:
     commands:
-      - chmod +x mvnw
-      - ./mvnw clean install
+      - mvn clean install
   # post_build:
   #   commands:
   #     - echo "post build"
